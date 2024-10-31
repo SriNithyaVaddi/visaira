@@ -1,0 +1,147 @@
+
+function initializeLoadingScreen() {
+  // Set up the loading screen scene, camera, and renderer
+  const loadingScene = new THREE.Scene();
+  const loadingCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+  loadingCamera.position.set(0, 0, 10);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  document.body.appendChild(renderer.domElement);
+  
+  // Create gradient background for loading screen
+  const colors = gradientColors();
+  const gradientMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      color1: { value: new THREE.Color(colors.color1) }, // Use colors.color1 instead of gradientColors.color1
+      color2: { value: new THREE.Color(colors.color2) }  // Use colors.color2 instead of gradientColors.color2
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 color1;
+      uniform vec3 color2;
+      varying vec2 vUv;
+      void main() {
+        gl_FragColor = vec4(mix(color1, color2, vUv.y), 1.0);
+      }
+    `,
+    side: THREE.BackSide
+  });
+  const gradientMesh = new THREE.Mesh(new THREE.SphereGeometry(1000, 32, 32), gradientMaterial);
+  gradientMesh.position.set(0, 0, 0);
+  loadingScene.add(gradientMesh);
+
+  // Create loading screen plane
+  const planeGeometry = new THREE.PlaneGeometry(6, 3);
+  const planeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const loadingPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+  loadingScene.add(loadingPlane);
+
+  // Add text to loading screen
+  let textMesh;
+  const loaderText = new THREE.FontLoader();
+  loaderText.load('Courier Prime_Regular.json', (font) => {
+    const textGeometry = new THREE.TextGeometry('Click and Hold to Enter', {
+      font: font,
+      size: 0.4,
+      height: 0.1,
+    });
+    const textMaterial = new THREE.MeshBasicMaterial({ color: 0xEC00F0 });
+    textMesh = new THREE.Mesh(textGeometry, textMaterial);
+    textMesh.position.set(-3, 0, 0.1);
+    loadingScene.add(textMesh);
+  });
+
+  // Add loading bar
+  const loadingBarContainer = document.createElement('div');
+  loadingBarContainer.style.position = 'fixed';
+  loadingBarContainer.style.top = '60%';
+  loadingBarContainer.style.left = '50%';
+  loadingBarContainer.style.transform = 'translate(-50%, -50%)';
+  loadingBarContainer.style.width = '50%';
+  loadingBarContainer.style.height = '20px';
+  loadingBarContainer.style.backgroundColor = '#ccc';
+  loadingBarContainer.style.borderRadius = '10px';
+  loadingBarContainer.style.overflow = 'hidden';
+  document.body.appendChild(loadingBarContainer);
+
+  const loadingBar = document.createElement('div');
+  loadingBar.style.width = '0%';
+  loadingBar.style.height = '100%';
+  loadingBar.style.backgroundColor = '#EC00F0';
+  loadingBar.style.borderRadius = '10px';
+  loadingBarContainer.appendChild(loadingBar);
+
+  let loadingProgress = 0;
+  function animateLoadingBar() {
+    if (loadingProgress < 100) {
+      loadingProgress += 1;
+      loadingBar.style.width = `${loadingProgress}%`;
+      requestAnimationFrame(animateLoadingBar);
+    }
+  }
+  animateLoadingBar();
+
+  // Render the loading screen
+  function animateLoadingScreen() {
+    requestAnimationFrame(animateLoadingScreen);
+    renderer.render(loadingScene, loadingCamera);
+  }
+  animateLoadingScreen();
+
+  // Gyroscope effect for loading screen
+  document.addEventListener('mousemove', (event) => {
+    const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+    const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Use GSAP to smoothly animate the camera rotation based on mouse movement
+    gsap.to(loadingCamera.rotation, {
+      x: THREE.MathUtils.degToRad(mouseY * 10),
+      y: THREE.MathUtils.degToRad(mouseX * 10),
+      duration: 0.5,
+      ease: 'power2.out'
+    });
+  });
+
+  // Click and hold to enter logic
+  let holdTimeout;
+  renderer.domElement.addEventListener('mousedown', () => {
+    holdTimeout = setTimeout(() => {
+      document.body.removeChild(renderer.domElement);
+      document.body.removeChild(loadingBarContainer);
+      initializeScene();
+    }, 2000); // User needs to hold click for 2 seconds to enter
+  });
+
+  renderer.domElement.addEventListener('mouseup', () => {
+    clearTimeout(holdTimeout); // Cancel entering if user releases mouse before 2 seconds
+  });
+
+  // Display instruction to scroll to navigate once loading completes
+  setTimeout(() => {
+    const scrollInstruction = document.createElement('div');
+    scrollInstruction.innerText = 'Scroll to navigate inside';
+    scrollInstruction.style.position = 'fixed';
+    scrollInstruction.style.top = '70%';
+    scrollInstruction.style.left = '50%';
+    scrollInstruction.style.transform = 'translate(-50%, -50%)';
+    scrollInstruction.style.fontSize = '20px';
+    scrollInstruction.style.color = '#ffffff';
+    scrollInstruction.style.zIndex = '1000';
+    document.body.appendChild(scrollInstruction);
+
+    setTimeout(() => {
+      scrollInstruction.style.opacity = '0';
+      setTimeout(() => {
+        document.body.removeChild(scrollInstruction);
+      }, 1000);
+    }, 3000);
+  }, 4000);
+}
